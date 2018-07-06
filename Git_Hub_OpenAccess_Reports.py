@@ -20,6 +20,7 @@ from email.mime.text import MIMEText
 #    Functions
 ###################
 
+#KB API Functions
 def queryBuilder(collectionName):
 
     parameters = "&link@rel=enclosure"
@@ -35,6 +36,7 @@ def callQuery(myUrl):
 
     return xmlOutput
 
+#Find, download and read Kbart
 def matchKbartFilePattern(xmlOutput):
 
     kbartUrl = re.findall('<link\shref=\"([^\s]*_kbart.txt)\"\srel="enclosure"\stype="text\/csv;\scharset=UTF-8\"\stitle=\"kbart\sfile\"\slength=\".*\"\s\/>', xmlOutput)
@@ -57,6 +59,7 @@ def kbartReader(myUrl):
 
     return csvfile
 
+#String cleaners
 def lineCleaner(line):
 
     lineArray = []
@@ -72,6 +75,7 @@ def stringCleaner(string):
 
     return string
 
+#Link checker
 def testUrl(currentUrl):
 
     status = ""
@@ -114,7 +118,8 @@ def statusSorting(status, currentLine, currentUrl, errorFoundArray, redirectsArr
             newUrl = r.url
             currentLine[9] = newUrl
             redirectsArray.append(currentLine)
-
+            
+#Print in file
 def printFile(myArray, filename):
 
     myPrintFile = open(filename, "w", newline = "", encoding="utf-8", errors= "ignore")
@@ -122,13 +127,15 @@ def printFile(myArray, filename):
     for line in myArray:
         writerFile.writerow(line)
 
-#The following email function has been adapted from a code shared by Rob (user:8747) on stack overflow. 
+#Send emails
+        
+# The following two email functions have been adapted from a code shared by Rob (user:8747) on stack overflow. 
 # https://stackoverflow.com/questions/41469952/sending-an-email-via-the-python-email-library-throws-error-expected-string-or-b
 
 def email(fromEmail, toEmail, filename, message):
 
     msg = MIMEMultipart()
-    msg['Subject'] = 'Problematic links in Open Access Collection'
+    msg['Subject'] = 'Report| Problematic links in Open Access Collection'
     msg['From'] = fromEmail
     msg['To'] = toEmail
     msg.preamble = 'preamble'
@@ -148,39 +155,71 @@ def email(fromEmail, toEmail, filename, message):
     server.sendmail(fromEmail, toEmail, msg.as_string())
     server.quit()
 
- 
+    
+ def noReportsEmail(fromEmail, toEmail, message):
+
+    msg = MIMEMultipart()
+    msg['Subject'] = 'Report| Problematic links in Open Access Collection'
+    msg['From'] = fromEmail
+    msg['To'] = toEmail
+
+    body = MIMEText(message)
+    msg.attach(body)
+
+    server = smtplib.SMTP('smtp.gmail.com', 587)
+    server.ehlo()
+    server.starttls()
+    server.login(fromEmail, "myPassword")
+    server.sendmail(fromEmail, toEmail, msg.as_string())
+    server.quit()
+
 
 ###################
 #    Main Code   
 ###################
 
+collectionsArray = ["ThisIsMyCollectionID", "ThisIsMyCollectionID2", "ThisIsMyCollectionID3"]
 
-errorFoundArray = []
-redirectsArray = []
-collection = "ThisIsMyCollectionID"
+for collection in collectionsArray:
 
+    errorFoundArray = []
+    redirectsArray = []
 
-myUrl = queryBuilder(collection + "?")
-xmlOutput = callQuery(myUrl)
-myKbartUrl = matchKbartFilePattern(xmlOutput)
+    myUrl = queryBuilder(collection + "?")
+    xmlOutput = callQuery(myUrl)
+    myKbartUrl = matchKbartFilePattern(xmlOutput)
 
-myKbart = kbartDownloadUrl(myKbartUrl[0])
-csvfile = kbartReader(myKbart)
-for line in csvfile:
-    cleanedLineArray = lineCleaner(line)
-    if cleanedLineArray[0] != "publication_title":
-        cleanedCurrentUrl = stringCleaner(cleanedLineArray[9])
-        urlStatus = testUrl(cleanedCurrentUrl)
-        statusSorting(urlStatus, cleanedLineArray, cleanedCurrentUrl, errorFoundArray, redirectsArray)
+    myKbart = kbartDownloadUrl(myKbartUrl[0])
+    csvfile = kbartReader(myKbart)
+    
+    for line in csvfile:
+        cleanedLineArray = lineCleaner(line)
+       
+        if cleanedLineArray[0] != "publication_title":
+            cleanedCurrentUrl = stringCleaner(cleanedLineArray[9])
+            urlStatus = testUrl(cleanedCurrentUrl)
+            statusSorting(urlStatus, cleanedLineArray, cleanedCurrentUrl, errorFoundArray, redirectsArray)
 
+            
+    if len(redirectsArray) > 0:
+        printFileName = "openAccess_redirects_results_" + collection + ".csv"
+        message = "Report of redirecting links in collection " + collection+ ". The links have been corrected in the attached file."
 
-if len(redirectsArray) > 0:
-    printFile(redirectsArray, "openAccess_redirects_results.csv")
-    email("fromEmail@gmail.com", "toEmail@email.ca","openAccess_redirects_results.csv", "Report of redirecting links in collection " + collection+ ". The links have been corrected in the attached file.")
+        printFile(redirectsArray, printFileName)
+        email("fromEmail@gmail.com", "toEmail@email.ca", printFileName, message)
 
-if len(errorFoundArray) > 0:
-    printFile(errorFoundArray, "openAccess_errors_results.csv")
-    email("fromEmail@gmail.com", "toEmail@email.ca","openAccess_errors_results.csv", "Report of broken links in collection " + collection + ".")
+    if len(errorFoundArray) > 0:
+        printFileName = "openAccess_errors_results_" + collection + ".csv"
+        message = "Report of broken links in collection " + collection + "."
+
+        printFile(errorFoundArray, printFileName)
+        email("fromEmail@gmail.com", "toEmail@email.ca", printFileName, message)
+    
+    elif len(errorFoundArray) == 0 and len(redirectsArray) == 0:
+        message = "No broken or redirecting links were found in collection: " + collection + "." 
+
+        noReportsEmail("fromEmail@gmail.com", "toEmail@email.ca", message)
+
 
 
 
