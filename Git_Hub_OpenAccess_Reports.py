@@ -90,7 +90,11 @@ def testUrl(currentUrl):
         else:
             try:
                 matchFound = re.match(newUrl, currentUrl)
-                if matchFound:
+                currentUrlWithSlash = currentUrl + "/"
+                matchCurrentUrlWithSlash = re.match(newUrl, currentUrlWithSlash)
+                newUrlWithSlash = newUrl + "/"
+                matchNewUrlWithSlash = re.match(newUrlWithSlash, line)
+                if matchFound or matchCurrentUrlWithSlash or matchNewUrlWithSlash:
                     status = "ok"
                 else:
                     status = "redirects"
