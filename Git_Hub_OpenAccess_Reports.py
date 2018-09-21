@@ -93,7 +93,7 @@ def testUrl(currentUrl):
                 currentUrlWithSlash = currentUrl + "/"
                 matchCurrentUrlWithSlash = re.match(newUrl, currentUrlWithSlash)
                 newUrlWithSlash = newUrl + "/"
-                matchNewUrlWithSlash = re.match(newUrlWithSlash, line)
+                matchNewUrlWithSlash = re.match(newUrlWithSlash, currentUrl)
                 if matchFound:
                     status = "ok"
                 elif matchCurrentUrlWithSlash:
